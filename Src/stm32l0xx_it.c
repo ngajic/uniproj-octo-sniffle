@@ -35,14 +35,13 @@
 #include "stm32l0xx.h"
 #include "stm32l0xx_it.h"
 
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
+#include "main.h"
 
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim2;
 extern UART_HandleTypeDef huart2;
 
+extern uint8_t rxBuff[BUFFER_SIZE];
 /******************************************************************************/
 /*            Cortex-M0+ Processor Interruption and Exception Handlers         */ 
 /******************************************************************************/
@@ -52,14 +51,8 @@ extern UART_HandleTypeDef huart2;
 */
 void SysTick_Handler(void)
 {
-  /* USER CODE BEGIN SysTick_IRQn 0 */
-
-  /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   HAL_SYSTICK_IRQHandler();
-  /* USER CODE BEGIN SysTick_IRQn 1 */
-
-  /* USER CODE END SysTick_IRQn 1 */
 }
 
 /******************************************************************************/
@@ -74,13 +67,7 @@ void SysTick_Handler(void)
 */
 void TIM2_IRQHandler(void)
 {
-  /* USER CODE BEGIN TIM2_IRQn 0 */
-
-  /* USER CODE END TIM2_IRQn 0 */
   HAL_TIM_IRQHandler(&htim2);
-  /* USER CODE BEGIN TIM2_IRQn 1 */
-
-  /* USER CODE END TIM2_IRQn 1 */
 }
 
 /**
@@ -88,13 +75,8 @@ void TIM2_IRQHandler(void)
 */
 void USART2_IRQHandler(void)
 {
-  /* USER CODE BEGIN USART2_IRQn 0 */
-
-  /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
-  /* USER CODE BEGIN USART2_IRQn 1 */
-
-  /* USER CODE END USART2_IRQn 1 */
+	HAL_UART_Receive_IT(&huart2, rxBuff, BUFFER_SIZE);
 }
 
 /* USER CODE BEGIN 1 */

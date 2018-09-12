@@ -40,84 +40,25 @@
 #include "main.h"
 #include "stm32l0xx_hal.h"
 
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
 
-/* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+/* Threshold value */
+__IO uint32_t thold = 200;
+/* UART buffer */
+uint8_t rxBuff[BUFFER_SIZE] = {0};
+/* Captured Value */
+__IO uint32_t            uwIC2Value = 0;
+/* Duty Cycle Value */
+__IO uint32_t            uwDutyCycle = 0;
+/* Frequency Value */
+__IO uint32_t            uwFrequency = 0;
 
-/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
-static void MX_TIM2_Init(void);
-
-/* USER CODE BEGIN PFP */
-/* Private function prototypes -----------------------------------------------*/
-
-/* USER CODE END PFP */
-
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
-
-/**
-  * @brief  The application entry point.
-  *
-  * @retval None
-  */
-int main(void)
-{
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration----------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_TIM2_Init();
-  /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-
-  /* USER CODE END WHILE */
-
-  /* USER CODE BEGIN 3 */
-
-  }
-  /* USER CODE END 3 */
-
-}
-
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -181,7 +122,7 @@ void SystemClock_Config(void)
 }
 
 /* TIM2 init function */
-static void MX_TIM2_Init(void)
+static void TIM2_Init(void)
 {
 
   TIM_ClockConfigTypeDef sClockSourceConfig;
@@ -245,9 +186,8 @@ static void MX_TIM2_Init(void)
 }
 
 /* USART2 init function */
-static void MX_USART2_UART_Init(void)
+static void USART2_UART_Init(void)
 {
-
   huart2.Instance = USART2;
   huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
@@ -262,7 +202,6 @@ static void MX_USART2_UART_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
 }
 
 /** Configure pins as 
@@ -272,7 +211,7 @@ static void MX_USART2_UART_Init(void)
         * EVENT_OUT
         * EXTI
 */
-static void MX_GPIO_Init(void)
+static void GPIO_Init(void)
 {
 
   GPIO_InitTypeDef GPIO_InitStruct;
@@ -291,12 +230,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
-
 }
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.
@@ -330,6 +264,74 @@ void assert_failed(uint8_t* file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
+  {
+    /* Get the Input Capture value */
+    uwIC2Value = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
+    
+    if (uwIC2Value != 0)
+    {
+      /* Duty cycle computation */
+      uwDutyCycle = ((HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1) + 1) * 100) / (uwIC2Value + 1);
+      
+      /* uwFrequency computation
+      TIM2 counter clock = RCC_Clocks.HCLK_Frequency */      
+      uwFrequency = HAL_RCC_GetHCLKFreq()/ (uwIC2Value + 1)/ htim->Init.Prescaler;
+    }
+    else
+    {
+      uwDutyCycle = 0;
+      uwFrequency = 0;
+    }
+	}
+	
+	if (uwFrequency < thold)
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+	else
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+	
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	int i;
+	
+	for (thold = 0, i = 0; i < BUFFER_SIZE; ++i)
+		thold = thold * 10 + rxBuff[i] - '0';
+}
+
+/**
+  * @brief  The application entry point.
+  *
+  * @retval None
+  */
+int main(void)
+{
+
+  /* MCU Configuration----------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* Initialize all configured peripherals */
+  GPIO_Init();
+  USART2_UART_Init();
+  TIM2_Init();
+	
+	__HAL_UART_ENABLE_IT(&huart2, UART_IT_RXNE); 
+	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
+	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+
+  /* Infinite loop */
+  while (1) {}
+
+}
 
 /**
   * @}

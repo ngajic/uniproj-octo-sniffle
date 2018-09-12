@@ -67,9 +67,7 @@
   */
 /* #define USE_FULL_ASSERT    1U */
 
-/* USER CODE BEGIN Private defines */
-
-/* USER CODE END Private defines */
+#define BUFFER_SIZE		4
 
 #ifdef __cplusplus
  extern "C" {
